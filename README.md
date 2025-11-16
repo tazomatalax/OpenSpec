@@ -126,11 +126,33 @@ These tools automatically read workflow instructions from `openspec/AGENTS.md`. 
 
 #### Step 1: Install the CLI globally
 
+**Official release:**
+
 ```bash
 npm install -g @fission-ai/openspec@latest
 ```
 
+**From this fork (includes GitHub issues integration):**
+
+```bash
+npm install -g tazomatalax/openspec
+```
+
+To stay synced with upstream updates while keeping your changes:
+
+```bash
+# One-time setup: Add upstream remote
+git remote add upstream https://github.com/Fission-AI/OpenSpec.git
+
+# Periodic updates: Sync and reinstall
+git fetch upstream
+git rebase upstream/main
+git push origin main  # Push synced changes to your fork
+npm install -g .      # Reinstall with updates
+```
+
 Verify installation:
+
 ```bash
 openspec --version
 ```
@@ -315,6 +337,81 @@ The system MUST require a second factor during login.
 
 **Important:** You don't create these files manually. Your AI assistant generates them based on your requirements and the existing codebase.
 
+## GitHub Issues Integration
+
+OpenSpec can project each change proposal into a GitHub issue, keeping the issue's task checklist synchronized with your `tasks.md` file. This bridges OpenSpec's repository-based planning with GitHub's issue tracking, notifications, and project management workflows.
+
+### Setup
+
+1. **Configure GitHub repository** (add to `openspec/config.json`):
+
+   ```json
+   {
+     "github": {
+       "owner": "your-org",
+       "repo": "your-repo",
+       "defaultLabels": ["openspec"]
+     }
+   }
+   ```
+
+   OpenSpec will try to auto-detect these from `git remote` if not configured.
+
+2. **Set GitHub token** (choose one):
+
+   - Environment variable: `export GITHUB_TOKEN=ghp_xxx`
+   - Config file: Add `"token": "ghp_xxx"` to the `github` object above
+
+   Create a token at <https://github.com/settings/tokens/new> with `repo` scope.
+
+### Usage
+
+**Create or update an issue** (smart default):
+
+```bash
+openspec issues add-feature
+```
+
+- First run: Creates a GitHub issue with title, summary, and tasks
+- Subsequent runs: Updates the tasks checklist to match current `tasks.md`
+
+**Preview changes**:
+
+```bash
+openspec issues add-feature --dry-run
+```
+
+**Explicit operations**:
+
+```bash
+openspec issues add-feature --create   # Force create (fails if exists)
+openspec issues add-feature --update   # Force update (fails if doesn't exist)
+```
+
+**Post a comment**:
+
+```bash
+openspec issues add-feature --comment "Deployed to staging"
+```
+
+**Auto-create after validation**:
+
+```bash
+openspec validate add-feature --create-issues
+```
+
+**Auto-close on archive**:
+
+```bash
+openspec archive add-feature  # Automatically closes associated GitHub issue
+```
+
+### GitHub Source of Truth
+
+- **Source of truth**: OpenSpec remains authoritative. GitHub issues are a derived, synchronized view.
+- **Task markers**: Issues include `<!-- openspec-tasks:start -->` and `<!-- openspec-tasks:end -->` markers to safely update the checklist without destroying manual edits elsewhere in the issue body.
+- **Metadata tracking**: Each change with a GitHub issue has an `issues.json` file storing issue number, URL, and timestamps.
+
 ## Understanding OpenSpec Files
 
 ### Delta Format
@@ -326,6 +423,7 @@ Deltas are "patches" that show how specs change:
 - **`## REMOVED Requirements`** - Deprecated features
 
 **Format requirements:**
+
 - Use `### Requirement: <name>` for headers
 - Every requirement needs at least one `#### Scenario:` block
 - Use SHALL/MUST in requirement text
@@ -333,15 +431,17 @@ Deltas are "patches" that show how specs change:
 ## How OpenSpec Compares
 
 ### vs. spec-kit
-OpenSpec’s two-folder model (`openspec/specs/` for the current truth, `openspec/changes/` for proposed updates) keeps state and diffs separate. This scales when you modify existing features or touch multiple specs. spec-kit is strong for greenfield/0→1 but provides less structure for cross-spec updates and evolving features.
+
+OpenSpec's two-folder model (`openspec/specs/` for the current truth, `openspec/changes/` for proposed updates) keeps state and diffs separate. This scales when you modify existing features or touch multiple specs. spec-kit is strong for greenfield/0→1 but provides less structure for cross-spec updates and evolving features.
 
 ### vs. Kiro.dev
+
 OpenSpec groups every change for a feature in one folder (`openspec/changes/feature-name/`), making it easy to track related specs, tasks, and designs together. Kiro spreads updates across multiple spec folders, which can make feature tracking harder.
 
 ### vs. No Specs
+
 Without specs, AI coding assistants generate code from vague prompts, often missing requirements or adding unwanted features. OpenSpec brings predictability by agreeing on the desired behavior before any code is written.
 
-## Team Adoption
 
 1. **Initialize OpenSpec** – Run `openspec init` in your repo.
 2. **Start with new features** – Ask your AI to capture upcoming work as change proposals.

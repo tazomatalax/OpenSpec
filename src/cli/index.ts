@@ -200,6 +200,27 @@ program
 
 registerSpecCommand(program);
 
+// Issues command (GitHub integration)
+program
+  .command('issues [change-id]')
+  .description('Create and manage GitHub issues for OpenSpec changes')
+  .option('--dry-run', 'Preview changes without modifying GitHub')
+  .option('--json', 'Output JSON instead of human-readable text')
+  .option('--create', 'Explicitly create a new issue (fails if issue exists)')
+  .option('--update', 'Explicitly update existing issue (fails if no issue exists)')
+  .option('--comment <message>', 'Post a comment to the issue')
+  .action(async (changeId?: string, options?: { dryRun?: boolean; json?: boolean; create?: boolean; update?: boolean; comment?: string }) => {
+    try {
+      const { IssuesCommand } = await import('../commands/issues.js');
+      const command = new IssuesCommand();
+      await command.execute(changeId, options || {});
+    } catch (error) {
+      console.log(); // Empty line for spacing
+      ora().fail(`Error: ${(error as Error).message}`);
+      process.exit(1);
+    }
+  });
+
 // Top-level validate command
 program
   .command('validate [item-name]')
@@ -212,7 +233,8 @@ program
   .option('--json', 'Output validation results as JSON')
   .option('--concurrency <n>', 'Max concurrent validations (defaults to env OPENSPEC_CONCURRENCY or 6)')
   .option('--no-interactive', 'Disable interactive prompts')
-  .action(async (itemName?: string, options?: { all?: boolean; changes?: boolean; specs?: boolean; type?: string; strict?: boolean; json?: boolean; noInteractive?: boolean; concurrency?: string }) => {
+  .option('--create-issues', 'Create GitHub issues for validated changes (only on successful validation)')
+  .action(async (itemName?: string, options?: { all?: boolean; changes?: boolean; specs?: boolean; type?: string; strict?: boolean; json?: boolean; noInteractive?: boolean; concurrency?: string; createIssues?: boolean }) => {
     try {
       const validateCommand = new ValidateCommand();
       await validateCommand.execute(itemName, options);

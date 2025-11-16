@@ -253,6 +253,19 @@ export class ArchiveCommand {
     await fs.rename(changeDir, archivePath);
     
     console.log(`Change '${changeName}' archived as '${archiveName}'.`);
+    
+    // Close associated GitHub issue if it exists
+    await this.closeGitHubIssueIfExists(changeName);
+  }
+  
+  private async closeGitHubIssueIfExists(changeName: string): Promise<void> {
+    try {
+      const { closeIssuesForChange } = await import('./issues/service.js');
+      await closeIssuesForChange(changeName, { json: false });
+    } catch (error) {
+      // Silently ignore errors - archive should succeed even if issue closing fails
+      // The error message will be logged by closeIssuesForChange if needed
+    }
   }
 
   private async selectChange(changesDir: string): Promise<string | null> {

@@ -65,6 +65,7 @@
   "dependencies": {
     "@inquirer/core": "^10.2.2",
     "@inquirer/prompts": "^7.8.0",
+    "@octokit/rest": "^22.0.1",
     "chalk": "^5.5.0",
     "commander": "^14.0.0",
     "ora": "^8.2.0",

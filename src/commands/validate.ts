@@ -17,6 +17,7 @@ interface ExecuteOptions {
   json?: boolean;
   noInteractive?: boolean;
   concurrency?: string;
+  createIssues?: boolean;
 }
 
 interface BulkItemResult {
@@ -53,7 +54,7 @@ export class ValidateCommand {
 
     // Direct item validation with type detection or override
     const typeOverride = this.normalizeType(options.type);
-    await this.validateDirectItem(itemName, { typeOverride, strict: !!options.strict, json: !!options.json });
+    await this.validateDirectItem(itemName, { typeOverride, strict: !!options.strict, json: !!options.json, createIssues: !!options.createIssues });
   }
 
   private normalizeType(value?: string): ItemType | undefined {
@@ -101,7 +102,7 @@ export class ValidateCommand {
     console.error('Or run in an interactive terminal.');
   }
 
-  private async validateDirectItem(itemName: string, opts: { typeOverride?: ItemType; strict: boolean; json: boolean }): Promise<void> {
+  private async validateDirectItem(itemName: string, opts: { typeOverride?: ItemType; strict: boolean; json: boolean; createIssues?: boolean }): Promise<void> {
     const [changes, specs] = await Promise.all([getActiveChangeIds(), getSpecIds()]);
     const isChange = changes.includes(itemName);
     const isSpec = specs.includes(itemName);
@@ -126,7 +127,7 @@ export class ValidateCommand {
     await this.validateByType(type, itemName, opts);
   }
 
-  private async validateByType(type: ItemType, id: string, opts: { strict: boolean; json: boolean }): Promise<void> {
+  private async validateByType(type: ItemType, id: string, opts: { strict: boolean; json: boolean; createIssues?: boolean }): Promise<void> {
     const validator = new Validator(opts.strict);
     if (type === 'change') {
       const changeDir = path.join(process.cwd(), 'openspec', 'changes', id);
@@ -134,6 +135,12 @@ export class ValidateCommand {
       const report = await validator.validateChangeDeltaSpecs(changeDir);
       const durationMs = Date.now() - start;
       this.printReport('change', id, report, durationMs, opts.json);
+      
+      // If validation passed and --create-issues is set, create GitHub issue
+      if (report.valid && opts.createIssues) {
+        await this.createIssueAfterValidation(id, opts.json);
+      }
+      
       // Non-zero exit if invalid (keeps enriched output test semantics)
       process.exitCode = report.valid ? 0 : 1;
       return;
@@ -144,6 +151,33 @@ export class ValidateCommand {
     const durationMs = Date.now() - start;
     this.printReport('spec', id, report, durationMs, opts.json);
     process.exitCode = report.valid ? 0 : 1;
+  }
+
+  private async createIssueAfterValidation(changeId: string, json: boolean): Promise<void> {
+    try {
+      const { hasGitHubIssue } = await import('../core/issues/storage.js');
+      const { createIssuesForChange } = await import('../core/issues/service.js');
+      
+      // Check if issue already exists
+      const exists = await hasGitHubIssue(changeId);
+      if (exists) {
+        if (!json) {
+          console.log(`ℹ GitHub issue already exists for change '${changeId}'. Use 'openspec issues ${changeId}' to update it.`);
+        }
+        return;
+      }
+      
+      // Create the issue
+      if (!json) {
+        console.log(`Creating GitHub issue for '${changeId}'...`);
+      }
+      await createIssuesForChange(changeId, { json });
+    } catch (error) {
+      if (!json) {
+        console.warn(`⚠ Warning: Could not create GitHub issue: ${error instanceof Error ? error.message : String(error)}`);
+      }
+      // Don't fail validation if issue creation fails
+    }
   }
 
   private printReport(type: ItemType, id: string, report: { valid: boolean; issues: any[] }, durationMs: number, json: boolean): void {
